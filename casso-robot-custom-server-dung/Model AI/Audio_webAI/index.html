@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat AI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f5f5f5;
+        }
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+        }
+        .message.user { justify-content: flex-end; }
+        .message-content {
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+        }
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        #userInput {
+            flex: 1;
+            padding: 12px 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+        #userInput:focus { border-color: #667eea; }
+        #sendBtn, #voiceBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #sendBtn {
+            padding: 12px 30px;
+        }
+        #sendBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+        #voiceBtn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 20px;
+        }
+        #voiceBtn.recording {
+            background: linear-gradient(135deg, #ff0000 0%, #ff6b6b 100%);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            50% { box-shadow: 0 0 0 15px rgba(255, 0, 0, 0); }
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #667eea;
+            font-style: italic;
+            padding: 10px;
+        }
+        .loading.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">💬 Chat AI</div>
+        <div class="chat-box" id="chatBox">
+            <div class="message assistant">
+                <div class="message-content">Xin chào! Tôi có thể giúp gì cho bạn? 😊</div>
+            </div>
+        </div>
+        <div class="loading" id="loading">Đang xử lý...</div>
+        <div class="input-area">
+            <button id="voiceBtn" onclick="toggleVoiceRecording()">🎤</button>
+            <input type="text" id="userInput" placeholder="Nhập tin nhắn..." onkeypress="handleKeyPress(event)">
+            <button id="sendBtn" onclick="sendMessage()">Gửi</button>
+        </div>
+    </div>
+
+    <script>
+        let conversationHistory = [];
+        let websocket = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let audioContext = null;
+        let currentSessionId = null;
+        let macAddress = 'web-' + Math.random().toString(36).substr(2, 9);
+        let currentAudioBuffers = {};
+        let micStream = null;
+
+        // Kết nối WebSocket
+        function connectWebSocket() {
+            websocket = new WebSocket('ws://localhost:8765');
+            websocket.onopen = () => console.log('WebSocket connected');
+            websocket.onmessage = async (event) => {
+                if (event.data instanceof Blob) {
+                    await handleAudioMessage(event.data);
+                } else {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'transcription' || data.type === 'chat_response') {
+                        addMessage(data.message, data.type === 'transcription' ? 'user' : 'assistant');
+                        conversationHistory.push({ role: data.type === 'transcription' ? 'user' : 'assistant', content: data.message });
+                        document.getElementById('loading').classList.remove('active');
+                    }
+                }
+            };
+            websocket.onerror = (error) => console.error('WebSocket error:', error);
+            websocket.onclose = () => setTimeout(connectWebSocket, 3000);
+        }
+
+        // Parse Audio Message
+        async function handleAudioMessage(blob) {
+            const data = new Uint8Array(await blob.arrayBuffer());
+            let offset = 0;
+            
+            const macLen = (data[offset] << 8) | data[offset + 1];
+            offset += 2 + macLen;
+            
+            const typeLen = (data[offset] << 8) | data[offset + 1];
+            offset += 2;
+            const msgType = new TextDecoder().decode(data.slice(offset, offset + typeLen));
+            offset += typeLen;
+            
+            const idLen = (data[offset] << 8) | data[offset + 1];
+            offset += 2;
+            const msgId = new TextDecoder().decode(data.slice(offset, offset + idLen));
+            offset += idLen;
+            
+            const dataLen = (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
+            offset += 4;
+            const audioData = data.slice(offset, offset + dataLen);
+            
+            if (msgType === 'START') {
+                currentAudioBuffers[msgId] = [];
+            } else if (msgType === 'PROCESSING' && audioData.length > 0) {
+                if (!currentAudioBuffers[msgId]) currentAudioBuffers[msgId] = [];
+                currentAudioBuffers[msgId].push(audioData);
+            } else if (msgType === 'END' && currentAudioBuffers[msgId]) {
+                const totalLength = currentAudioBuffers[msgId].reduce((sum, chunk) => sum + chunk.length, 0);
+                const mergedAudio = new Uint8Array(totalLength);
+                let off = 0;
+                for (const chunk of currentAudioBuffers[msgId]) {
+                    mergedAudio.set(chunk, off);
+                    off += chunk.length;
+                }
+                await playAudioChunk(mergedAudio);
+                delete currentAudioBuffers[msgId];
+            }
+        }
+
+        // Play audio
+        async function playAudioChunk(pcmData) {
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            
+            const byteLength = pcmData.length - (pcmData.length % 2);
+            const dataView = new DataView(pcmData.buffer, pcmData.byteOffset, byteLength);
+            const numSamples = byteLength / 2;
+            const float32Array = new Float32Array(numSamples);
+            
+            for (let i = 0; i < numSamples; i++) {
+                float32Array[i] = dataView.getInt16(i * 2, true) / 32768.0;
+            }
+            
+            const audioBuffer = audioContext.createBuffer(1, numSamples, 24000);
+            audioBuffer.getChannelData(0).set(float32Array);
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.start();
+        }
+
+        // Create Wire Protocol message
+        function createWireMessage(macAddr, type, id, audioData = new Uint8Array(0)) {
+            const encoder = new TextEncoder();
+            const macBytes = encoder.encode(macAddr);
+            const typeBytes = encoder.encode(type);
+            const idBytes = encoder.encode(id);
+            
+            const totalSize = 2 + macBytes.length + 2 + typeBytes.length + 2 + idBytes.length + 4 + audioData.length;
+            const buffer = new ArrayBuffer(totalSize);
+            const view = new DataView(buffer);
+            const uint8View = new Uint8Array(buffer);
+            let offset = 0;
+            
+            view.setUint16(offset, macBytes.length, false);
+            offset += 2;
+            uint8View.set(macBytes, offset);
+            offset += macBytes.length;
+            
+            view.setUint16(offset, typeBytes.length, false);
+            offset += 2;
+            uint8View.set(typeBytes, offset);
+            offset += typeBytes.length;
+            
+            view.setUint16(offset, idBytes.length, false);
+            offset += 2;
+            uint8View.set(idBytes, offset);
+            offset += idBytes.length;
+            
+            view.setUint32(offset, audioData.length, false);
+            offset += 4;
+            uint8View.set(audioData, offset);
+            
+            return buffer;
+        }
+
+        // Toggle voice recording
+        async function toggleVoiceRecording() {
+            isRecording ? await stopRecording() : await startRecording();
+        }
+
+        // Init microphone
+        async function initMicrophone() {
+            if (micStream) return true;
+            try {
+                micStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true } 
+                });
+                return true;
+            } catch (error) {
+                alert('Không thể truy cập microphone.');
+                return false;
+            }
+        }
+
+        // Start recording
+        async function startRecording() {
+            if (!micStream && !await initMicrophone()) return;
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+                connectWebSocket();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm;codecs=opus' });
+            audioChunks = [];
+            currentSessionId = generateUUID();
+            
+            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunks.push(event.data); };
+            mediaRecorder.onstop = async () => await sendAudioToServer(new Blob(audioChunks, { type: 'audio/webm' }));
+            mediaRecorder.start();
+            isRecording = true;
+            
+            document.getElementById('voiceBtn').classList.add('recording');
+            document.getElementById('voiceBtn').textContent = '⏹️';
+        }
+
+        // Stop recording
+        async function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                document.getElementById('voiceBtn').classList.remove('recording');
+                document.getElementById('voiceBtn').textContent = '🎤';
+            }
+        }
+
+        // Send audio to server
+        async function sendAudioToServer(audioBlob) {
+            try {
+                document.getElementById('loading').classList.add('active');
+                
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                const offlineContext = new OfflineAudioContext(1, audioBuffer.duration * 24000, 24000);
+                const source = offlineContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(offlineContext.destination);
+                source.start();
+                
+                const renderedBuffer = await offlineContext.startRendering();
+                const pcmData = renderedBuffer.getChannelData(0);
+                
+                const int16Data = new Int16Array(pcmData.length);
+                for (let i = 0; i < pcmData.length; i++) {
+                    const s = Math.max(-1, Math.min(1, pcmData[i]));
+                    int16Data[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                }
+                
+                websocket.send(createWireMessage(macAddress, 'START', currentSessionId));
+                
+                const chunkSize = 4096;
+                const uint8Data = new Uint8Array(int16Data.buffer);
+                for (let i = 0; i < uint8Data.length; i += chunkSize) {
+                    websocket.send(createWireMessage(macAddress, 'PROCESSING', currentSessionId, uint8Data.slice(i, i + chunkSize)));
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                websocket.send(createWireMessage(macAddress, 'END', currentSessionId));
+            } catch (error) {
+                addMessage('Lỗi xử lý audio: ' + error.message, 'assistant');
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        // Generate UUID
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+
+        // Init
+        window.onload = async function() {
+            connectWebSocket();
+            await initMicrophone();
+        };
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendMessage();
+        }
+
+        async function sendMessage() {
+            const userInput = document.getElementById('userInput');
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, 'user');
+            userInput.value = '';
+            conversationHistory.push({ role: 'user', content: message });
+
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('sendBtn').disabled = true;
+
+            try {
+                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(JSON.stringify({
+                        type: 'chat',
+                        message: message,
+                        history: conversationHistory.slice(0, -1),
+                        voice_output: true,
+                        mac_address: macAddress
+                    }));
+                } else {
+                    throw new Error('Chưa kết nối server!');
+                }
+            } catch (error) {
+                addMessage('Lỗi: ' + error.message, 'assistant');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('sendBtn').disabled = false;
+            }
+        }
+
+        function addMessage(text, sender) {
+            const chatBox = document.getElementById('chatBox');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = text;
+            
+            messageDiv.appendChild(contentDiv);
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
