@@ -286,7 +286,7 @@ async def handle_audio_message(websocket, data):
                             processing_msg = create_message(mac_address, "PROCESSING", response_id, chunk)
                             await websocket.send(processing_msg)
                             chunk_count += 1
-                            await asyncio.sleep(0.01)  # Tránh quá tải
+                            await asyncio.sleep(0.03)  # Giảm từ 0.05s → 0.03s (vừa đủ cho ESP32 có PSRAM)
                         
                         print(f"Sent {chunk_count} PROCESSING chunks")
                         
@@ -352,9 +352,10 @@ async def handle_text_message(websocket, message):
                     chunk_count = 0
                     for i in range(0, len(audio_samples), chunk_size):
                         chunk = audio_samples[i:i+chunk_size]
-                        await websocket.send(create_message(mac_address, "PROCESSING", response_id, chunk))
+                        processing_msg = create_message(mac_address, "PROCESSING", response_id, chunk)
+                        await websocket.send(processing_msg)
                         chunk_count += 1
-                        await asyncio.sleep(0.01)
+                        await asyncio.sleep(0.03)  # Giảm từ 0.05s → 0.03s (ESP32 đã có PSRAM)
                     
                     print(f"Sent {chunk_count} audio chunks")
                     
@@ -369,10 +370,13 @@ async def handle_text_message(websocket, message):
 
 async def main():
     """Main server"""
-    print("Starting WebSocket server on ws://localhost:8765")
-    print("Đảm bảo đã set OPENAI_API_KEY trong environment variables")
+    print("Starting WebSocket server on ws://0.0.0.0:8765")
+    print("Server accessible at:")
+    print("  - ws://localhost:8765 (local browser)")
+    print("  - ws://192.168.1.185:8765 (ESP32 and other devices)")
+    print("\nĐảm bảo đã set OPENAI_API_KEY trong environment variables")
     
-    async with websockets.serve(handle_websocket, "localhost", 8765):
+    async with websockets.serve(handle_websocket, "0.0.0.0", 8765):
         await asyncio.Future()  # Run forever
 
 if __name__ == "__main__":
