@@ -97,8 +97,14 @@
             animation: pulse 1.5s infinite;
         }
         @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
-            50% { box-shadow: 0 0 0 15px rgba(255, 0, 0, 0); }
+            0%, 100% { 
+                box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7);
+                transform: scale(1);
+            }
+            50% { 
+                box-shadow: 0 0 0 15px rgba(255, 0, 0, 0);
+                transform: scale(1.05);
+            }
         }
         .loading {
             display: none;
@@ -137,6 +143,13 @@
         let macAddress = 'web-' + Math.random().toString(36).substr(2, 9);
         let currentAudioBuffers = {};
         let micStream = null;
+        let silenceTimer = null;
+        let audioAnalyzer = null;
+        let silenceThreshold = 0.01; // Ngưỡng phát hiện im lặng
+        let silenceDelay = 3000; // 3 giây
+        let autoRestartRecording = true; // Tự động bật lại mic sau khi gửi
+        let waitingForResponse = false; // Đang đợi response từ server
+        let responseReceived = { transcription: false, audio: false }; // Track các response đã nhận
 
         // Kết nối WebSocket
         function connectWebSocket() {
@@ -147,10 +160,16 @@
                     await handleAudioMessage(event.data);
                 } else {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'transcription' || data.type === 'chat_response') {
-                        addMessage(data.message, data.type === 'transcription' ? 'user' : 'assistant');
-                        conversationHistory.push({ role: data.type === 'transcription' ? 'user' : 'assistant', content: data.message });
+                    if (data.type === 'transcription') {
+                        addMessage(data.message, 'user');
+                        conversationHistory.push({ role: 'user', content: data.message });
+                        responseReceived.transcription = true;
+                        console.log('Transcription received');
+                    } else if (data.type === 'chat_response') {
+                        addMessage(data.message, 'assistant');
+                        conversationHistory.push({ role: 'assistant', content: data.message });
                         document.getElementById('loading').classList.remove('active');
+                        console.log('Chat response received');
                     }
                 }
             };
@@ -195,6 +214,23 @@
                 }
                 await playAudioChunk(mergedAudio);
                 delete currentAudioBuffers[msgId];
+                
+                // Audio đã phát xong, đánh dấu đã nhận audio response
+                console.log('Audio playback completed');
+                responseReceived.audio = true;
+                
+                // Đợi 3 giây sau khi audio phát xong rồi mới bật mic
+                if (waitingForResponse && responseReceived.transcription && responseReceived.audio) {
+                    console.log('Waiting 3 seconds before auto-restarting recording...');
+                    setTimeout(async () => {
+                        if (autoRestartRecording && micStream && micStream.active) {
+                            console.log('Auto-restarting recording now...');
+                            waitingForResponse = false;
+                            responseReceived = { transcription: false, audio: false };
+                            await startRecording();
+                        }
+                    }, 3000);
+                }
             }
         }
 
@@ -217,7 +253,15 @@
             const source = audioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(audioContext.destination);
-            source.start();
+            
+            // Đợi audio phát xong
+            return new Promise((resolve) => {
+                source.onended = () => {
+                    console.log('Audio playback finished');
+                    resolve();
+                };
+                source.start();
+            });
         }
 
         // Create Wire Protocol message
@@ -257,7 +301,15 @@
 
         // Toggle voice recording
         async function toggleVoiceRecording() {
-            isRecording ? await stopRecording() : await startRecording();
+            if (isRecording) {
+                // Dừng thu âm và TẮT chế độ tự động
+                autoRestartRecording = false;
+                await stopRecording();
+            } else {
+                // Bật thu âm và BẬT chế độ tự động
+                autoRestartRecording = true;
+                await startRecording();
+            }
         }
 
         // Init microphone
@@ -265,13 +317,65 @@
             if (micStream) return true;
             try {
                 micStream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: { sampleRate: 24000, channelCount: 1, echoCancellation: true, noiseSuppression: true } 
+                    audio: { 
+                        sampleRate: 24000, 
+                        channelCount: 1, 
+                        echoCancellation: true, 
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    } 
                 });
+                console.log('Microphone initialized and ready');
                 return true;
             } catch (error) {
                 alert('Không thể truy cập microphone.');
                 return false;
             }
+        }
+
+        // Phát hiện im lặng
+        function startSilenceDetection() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+            }
+
+            const source = audioContext.createMediaStreamSource(micStream);
+            audioAnalyzer = audioContext.createAnalyser();
+            audioAnalyzer.fftSize = 2048;
+            source.connect(audioAnalyzer);
+
+            const bufferLength = audioAnalyzer.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function checkAudioLevel() {
+                if (!isRecording) return;
+
+                audioAnalyzer.getByteTimeDomainData(dataArray);
+                
+                // Tính mức độ âm thanh
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    const normalized = (dataArray[i] - 128) / 128;
+                    sum += normalized * normalized;
+                }
+                const rms = Math.sqrt(sum / bufferLength);
+
+                // Reset timer nếu có âm thanh
+                if (rms > silenceThreshold) {
+                    if (silenceTimer) {
+                        clearTimeout(silenceTimer);
+                    }
+                    silenceTimer = setTimeout(async () => {
+                        console.log('Detected 3 seconds of silence, auto-sending...');
+                        await stopRecording();
+                    }, silenceDelay);
+                }
+
+                // Kiểm tra liên tục
+                requestAnimationFrame(checkAudioLevel);
+            }
+
+            checkAudioLevel();
         }
 
         // Start recording
@@ -286,13 +390,38 @@
             audioChunks = [];
             currentSessionId = generateUUID();
             
-            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunks.push(event.data); };
-            mediaRecorder.onstop = async () => await sendAudioToServer(new Blob(audioChunks, { type: 'audio/webm' }));
+            mediaRecorder.ondataavailable = (event) => { 
+                if (event.data.size > 0) audioChunks.push(event.data); 
+            };
+            
+            mediaRecorder.onstop = async () => {
+                if (silenceTimer) {
+                    clearTimeout(silenceTimer);
+                    silenceTimer = null;
+                }
+                
+                // Đặt trạng thái đang đợi response
+                waitingForResponse = true;
+                responseReceived = { transcription: false, audio: false };
+                
+                await sendAudioToServer(new Blob(audioChunks, { type: 'audio/webm' }));
+            };
+            
             mediaRecorder.start();
             isRecording = true;
             
+            // Bắt đầu phát hiện im lặng
+            startSilenceDetection();
+            
+            // Khởi động timer ban đầu
+            silenceTimer = setTimeout(async () => {
+                console.log('Initial 3 seconds passed, auto-sending...');
+                await stopRecording();
+            }, silenceDelay);
+            
             document.getElementById('voiceBtn').classList.add('recording');
             document.getElementById('voiceBtn').textContent = '⏹️';
+            console.log('Recording started...');
         }
 
         // Stop recording
@@ -300,8 +429,15 @@
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
+                
+                if (silenceTimer) {
+                    clearTimeout(silenceTimer);
+                    silenceTimer = null;
+                }
+                
                 document.getElementById('voiceBtn').classList.remove('recording');
                 document.getElementById('voiceBtn').textContent = '🎤';
+                console.log('Recording stopped');
             }
         }
 
@@ -339,9 +475,17 @@
                 }
                 
                 websocket.send(createWireMessage(macAddress, 'END', currentSessionId));
+                console.log('Audio sent to server, waiting for response...');
             } catch (error) {
                 addMessage('Lỗi xử lý audio: ' + error.message, 'assistant');
                 document.getElementById('loading').classList.remove('active');
+                waitingForResponse = false;
+                // Nếu lỗi, vẫn tự động bật lại mic
+                if (autoRestartRecording && micStream && micStream.active) {
+                    setTimeout(async () => {
+                        await startRecording();
+                    }, 1000);
+                }
             }
         }
 
@@ -356,7 +500,9 @@
         // Init
         window.onload = async function() {
             connectWebSocket();
+            // Khởi tạo mic ngay từ đầu để duy trì kết nối
             await initMicrophone();
+            console.log('App ready! Microphone is connected and ready.');
         };
 
         function handleKeyPress(event) {

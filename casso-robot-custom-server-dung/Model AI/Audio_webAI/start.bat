@@ -41,6 +41,46 @@ if "%OPENAI_API_KEY%"=="" (
 
 echo [OK] API Key loaded from .env
 echo.
+echo ====================================
+echo   Checking Port 8765
+echo ====================================
+echo.
+echo Checking if port 8765 is already in use...
+
+REM Kill any process using port 8765
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8765" ^| findstr "LISTENING"') do (
+    echo Found process using port 8765: PID %%a
+    echo Killing process %%a...
+    taskkill /F /PID %%a >nul 2>&1
+    if errorlevel 1 (
+        echo [WARNING] Could not kill process %%a - May need admin rights
+    ) else (
+        echo [OK] Process %%a killed successfully
+    )
+)
+
+echo [OK] Port 8765 is ready!
+timeout /t 1 >nul
+echo.
+echo ====================================
+echo   Testing Products Database
+echo ====================================
+echo.
+echo Running products.py test...
+python products.py
+echo.
+if errorlevel 1 (
+    echo [ERROR] Products test failed!
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Products database working!
+echo.
+echo ====================================
+echo   Starting WebSocket Server
+echo ====================================
+echo.
 echo Starting WebSocket Server...
 echo Server will run at: ws://localhost:8765
 echo.

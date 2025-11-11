@@ -7,11 +7,11 @@
 
 
 // TFT Pins
-#define TFT_CS 5
-#define TFT_DC 16
-#define TFT_RST 17
-#define TFT_SDA 23
-#define TFT_SCK 18
+#define TFT_CS 35
+#define TFT_DC 36
+#define TFT_RST 37
+#define TFT_SDA 38
+#define TFT_SCK 39
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 320
 
