@@ -845,7 +845,7 @@ async def handle_audio_message(websocket, data):
                                 processing_msg = create_message(mac_address, "PROCESSING", response_id, chunk)
                                 await websocket.send(processing_msg)
                                 chunk_count += 1
-                                await asyncio.sleep(0.005)  # Giảm từ 0.03s → 0.005s để gửi nhanh hơn
+                                await asyncio.sleep(0.01)  # Tăng lên 0.01s để ESP32 kịp phát, tránh tràn queue
                             
                             print(f"Sent {chunk_count} PROCESSING chunks")
                             
@@ -923,7 +923,7 @@ async def handle_text_message(websocket, message):
                         processing_msg = create_message(mac_address, "PROCESSING", response_id, chunk)
                         await websocket.send(processing_msg)
                         chunk_count += 1
-                        await asyncio.sleep(0.005)  # Giảm từ 0.03s → 0.005s để gửi nhanh hơn
+                        await asyncio.sleep(0.01)  # Tăng lên 0.01s để ESP32 kịp phát, tránh tràn queue
                     
                     print(f"Sent {chunk_count} audio chunks")
                     
