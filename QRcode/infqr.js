@@ -7,8 +7,8 @@ const response = await fetch('https://api.vietqr.io/v2/generate', {
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    accountNo: 113366668888,
-    accountName: "QUY VAC XIN PHONG CHONG COVID",
+    accountNo: "0987648717",
+    accountName: "HO NGOC DUNG",
     acqId: 970415,
     amount: 79000,
     addInfo: "Ung Ho Quy Vac Xin",
