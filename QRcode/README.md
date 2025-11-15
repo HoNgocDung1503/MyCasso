@@ -1,5 +1,5 @@
 B1: Run file infqr.js để lấy qr code: 
-lệnh terminal   node infqr.js
+lệnh terminal  :    node infqr.js
 
 
 
