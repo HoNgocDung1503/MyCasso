@@ -1,4 +1,6 @@
-B1: Run file infqr.js để lấy qr code
+B1: Run file infqr.js để lấy qr code: 
+lệnh terminal   node infqr.js
+
 
 
 
