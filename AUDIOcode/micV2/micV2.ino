@@ -78,7 +78,7 @@ bool wsConnected = false;
 #define I2S_READ_LEN 8192      // Tăng từ 4KB → 8KB để khớp với server
 #define CHUNK_SIZE 8192        // Tăng từ 4KB → 8KB để khớp với server.py chunk_size
 #define SILENCE_THRESHOLD 150.0f
-#define SILENCE_DURATION 3000  // 3 giây im lặng (giảm từ 5s)
+#define SILENCE_DURATION 3000  // 3 giây im lặng 
 
 bool recordingActive = false;
 bool playbackActive = false;
@@ -430,7 +430,7 @@ void audioPlaybackTaskFunction(void* parameter) {
       
       if (result == ESP_OK) {
         totalChunksPlayed++;
-        // Log mỗi 30 chunks để giảm spam log (tăng từ 20 vì chunk lớn hơn)
+        // Log mỗi 30 chunks để giảm spam log 
         if (totalChunksPlayed % 30 == 0) {
           Serial.printf(">>> Played %d chunks | Queue: %d\n", totalChunksPlayed, queueCount);
         }
@@ -556,7 +556,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
         endSignalReceived = true;  // Đánh dấu kết thúc để không đợi thêm
         // KHÔNG clear queue và KHÔNG set playbackActive = false
       }
-      // clearAudioQueue();  // ❌ BỎ: Không xóa queue để phát hết
+      
       break;
 
     case WStype_ERROR:
@@ -653,7 +653,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length) {
             }
           }
           else if (type == "TEXT.OUTPUT.TRANSCRIPT") {
-            String data = doc["data"] | "";
+            String data = doc["data"] | "";  
             if (data.length() > 0) {
               Serial.println("═══════════════════════════════════");
               Serial.println("🤖 TRỢ LÝ: " + data);

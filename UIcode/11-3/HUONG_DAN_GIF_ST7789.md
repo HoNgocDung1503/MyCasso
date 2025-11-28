@@ -1,16 +1,5 @@
 # Hướng dẫn hiển thị GIF lên màn hình ST7789 với ESP32
 
-## 📋 Yêu cầu
-
-### Phần cứng:
-- ESP32 (bất kỳ board nào)
-- Màn hình ST7789 (240x320)
-- Dây kết nối
-
-### Phần mềm:
-- Arduino IDE (đã cài đặt ESP32 board)
-- Python 3.x
-- Thư viện Python: Pillow
 
 ## 🔌 Sơ đồ kết nối
 

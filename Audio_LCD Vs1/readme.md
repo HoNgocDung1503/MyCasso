@@ -1,0 +1,1 @@
+code này hiển thị thông tin chat giữa người dùng và AI lên màn hình lcd, k có UI

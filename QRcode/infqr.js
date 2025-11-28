@@ -11,7 +11,7 @@ const response = await fetch('https://api.vietqr.io/v2/generate', {
     accountName: "HO NGOC DUNG",
     acqId: 970415,
     amount: 79000,
-    addInfo: "Ung Ho Quy Vac Xin",
+    addInfo: "aaaaaaaa",
     format: "text",
     template: "compact"
   })

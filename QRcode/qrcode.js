@@ -17,8 +17,8 @@ QRCode.toDataURL(qrCodeString, {
   
   // Lưu ảnh QR code
   const base64Data = url.replace(/^data:image\/png;base64,/, '');
-  fs.writeFileSync('qr.png', base64Data, 'base64');
-  console.log('✅ QR code saved as qr.png');
+  fs.writeFileSync('qr41.png', base64Data, 'base64');
+  console.log('✅ QR code saved as qr41.png');
 });
 
 // Tạo matrix 41x41 dạng text
@@ -41,17 +41,16 @@ QRCode.toDataURL(qrCodeString, {
   errorCorrectionLevel: 'L',
   version: 6, // Version 6 = 41x41
   margin: 0
-}, async (err, url) => {
+}, (err, url) => {
   if (err) {
     console.error('Lỗi:', err);
     return;
   }
-  
-  // Decode matrix từ module qrcode
-  const qr = await import('qrcode');
-  const segments = qr.default.create(qrCodeString, { errorCorrectionLevel: 'L', version: 6 });
-  const modules = segments.modules;
-  
+
+  // Tạo matrix từ QRCode.create
+  const qrObj = QRCode.create(qrCodeString, { errorCorrectionLevel: 'L', version: 6 });
+  const modules = qrObj.modules;
+
   // Tạo array 2D theo format [[1,0,1,...],[1,0,1,...],...]
   let matrix = '[';
   for (let y = 0; y < modules.size; y++) {

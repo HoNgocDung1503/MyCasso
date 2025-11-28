@@ -13,7 +13,7 @@
 #include <Adafruit_ST7789.h>
 #include <SPI.h>
 
-#include "emoji_hon_frames.h"       // Hôn: 80x48 frames 80 30
+#include "emoji_hon_frames.h"       // Hôn: 80x48 frames 80 22
 #include "emoji_batngo_frames.h"    // Bất ngờ: 80x48 frames 80 50 lang nghe
 #include "emoji_buonngu_frames.h"   //buồn ngủ: 80 x48 frames 80 40 
 #include "emoji_tutin_frames.h"       // Tự tin: 80x48 frames 80 50 noi chuyen
@@ -25,11 +25,11 @@
 #include "emoji_ngongan_frames.h" // Ngóng ăn: 80x48 frames 80 40
 
 // ST7789 Pin definitions for ESP32
-#define TFT_CS   5
-#define TFT_DC   16
-#define TFT_RST  17
-#define TFT_MOSI 23  // SDA
-#define TFT_SCLK 18  // SCK
+#define TFT_CS   10
+#define TFT_DC   21
+#define TFT_RST  47
+#define TFT_MOSI 13  // SDA
+#define TFT_SCLK 12  // SCK
 
 // Create display object
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);

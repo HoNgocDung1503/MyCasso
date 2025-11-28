@@ -1,0 +1,119 @@
+{
+  "banh_mi": {
+    "id": "banh_mi",
+    "name": "Bánh mì",
+    "price": 30000.0,
+    "unit": "cái",
+    "category": "Thức ăn",
+    "available": true,
+    "is_custom": true
+  },
+  "banh_mi_sua": {
+    "id": "banh_mi_sua",
+    "name": "Bánh mì sữa",
+    "price": 22000.0,
+    "unit": "cái",
+    "category": "Thức ăn",
+    "available": true,
+    "is_custom": true
+  },
+  "pho": {
+    "id": "pho",
+    "name": "Phở",
+    "price": 45000.0,
+    "unit": "tô",
+    "category": "Thức ăn",
+    "available": true,
+    "is_custom": true
+  },
+  "bun_bo": {
+    "id": "bun_bo",
+    "name": "Bún bò",
+    "price": 50000.0,
+    "unit": "tô",
+    "category": "Thức ăn",
+    "available": true,
+    "is_custom": true
+  },
+  "sua": {
+    "id": "sua",
+    "name": "Sữa",
+    "price": 12000.0,
+    "unit": "hộp",
+    "category": "Đồ uống",
+    "available": true,
+    "is_custom": true
+  },
+  "nuoc_ngot": {
+    "id": "nuoc_ngot",
+    "name": "Nước ngọt",
+    "price": 15000.0,
+    "unit": "chai",
+    "category": "Đồ uống",
+    "available": true,
+    "is_custom": true
+  },
+  "ca_phe": {
+    "id": "ca_phe",
+    "name": "Cà phê",
+    "price": 25000.0,
+    "unit": "ly",
+    "category": "Đồ uống",
+    "available": true,
+    "is_custom": true
+  },
+  "nuoc_suoi": {
+    "id": "nuoc_suoi",
+    "name": "Nước suối",
+    "price": 8000.0,
+    "unit": "chai",
+    "category": "Đồ uống",
+    "available": true,
+    "is_custom": true
+  },
+  "keo": {
+    "id": "keo",
+    "name": "Kẹo",
+    "price": 5000.0,
+    "unit": "gói",
+    "category": "Snack",
+    "available": true,
+    "is_custom": true
+  },
+  "tao": {
+    "id": "tao",
+    "name": "Táo",
+    "price": 30000.0,
+    "unit": "kg",
+    "category": "Trái cây",
+    "available": true,
+    "is_custom": true
+  },
+  "cam": {
+    "id": "cam",
+    "name": "Cam",
+    "price": 40000.0,
+    "unit": "kg",
+    "category": "Trái cây",
+    "available": true,
+    "is_custom": true
+  },
+  "bún_riêu_cua": {
+    "id": "bún_riêu_cua",
+    "name": "Bún Riêu Cua",
+    "price": 30000.0,
+    "unit": "cái",
+    "category": "Thức ăn",
+    "available": true,
+    "is_custom": true
+  },
+  "bánh_canh": {
+    "id": "bánh_canh",
+    "name": "Bánh Canh",
+    "price": 30000.0,
+    "unit": "tô",
+    "category": "Thức ăn",
+    "available": true,
+    "is_custom": true
+  }
+}
